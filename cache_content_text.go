@@ -18,6 +18,7 @@ const ContentTypeCell = 0
 // ContentTypeText text
 const ContentTypeText = 1
 
+var errAppendUnderlineNotFound = errors.New("error AppendUnderline not found font")
 var ErrContentTypeNotFound = errors.New("contentType not found")
 
 type cacheContentText struct {
@@ -136,17 +137,17 @@ func FormatFloatTrim(floatval float64) (formatted string) {
 func (c *cacheContentText) write(w io.Writer, protection *PDFProtection) error {
 	x, err := c.calX()
 	if err != nil {
-		return err
+		return fmt.Errorf("c.calX: %w", err)
 	}
 	y, err := c.calY()
 	if err != nil {
-		return err
+		return fmt.Errorf("c.calY: %w", err)
 	}
 
 	for _, extGStateIndex := range c.cellOpt.extGStateIndexes {
 		linkToGSObj := fmt.Sprintf("/GS%d gs\n", extGStateIndex)
 		if _, err := io.WriteString(w, linkToGSObj); err != nil {
-			return err
+			return fmt.Errorf("io.WriteString: %w", err)
 		}
 	}
 
@@ -171,7 +172,7 @@ func (c *cacheContentText) write(w io.Writer, protection *PDFProtection) error {
 		if err == ErrCharNotFound {
 			continue
 		} else if err != nil {
-			return err
+			return fmt.Errorf("c.fontSubset.CharIndex: %w", err)
 		}
 
 		pairvalPdfUnit := 0
@@ -193,7 +194,7 @@ func (c *cacheContentText) write(w io.Writer, protection *PDFProtection) error {
 
 	if c.fontStyle&Underline == Underline {
 		if err := c.underline(w); err != nil {
-			return err
+			return fmt.Errorf("c.underline: %w", err)
 		}
 	}
 
@@ -215,7 +216,7 @@ func (c *cacheContentText) drawBorder(w io.Writer) error {
 		endY := startY
 		_, err := fmt.Fprintf(w, "%0.2f %0.2f m %0.2f %0.2f l s\n", startX, startY, endX, endY)
 		if err != nil {
-			return err
+			return fmt.Errorf("fmt.Fprintf: %w", err)
 		}
 	}
 
@@ -226,7 +227,7 @@ func (c *cacheContentText) drawBorder(w io.Writer) error {
 		endY := startY - c.cellHeightPdfUnit
 		_, err := fmt.Fprintf(w, "%0.2f %0.2f m %0.2f %0.2f l s\n", startX, startY, endX, endY)
 		if err != nil {
-			return err
+			return fmt.Errorf("fmt.Fprintf: %w", err)
 		}
 	}
 
@@ -237,7 +238,7 @@ func (c *cacheContentText) drawBorder(w io.Writer) error {
 		endY := startY - c.cellHeightPdfUnit
 		_, err := fmt.Fprintf(w, "%0.2f %0.2f m %0.2f %0.2f l s\n", startX, startY, endX, endY)
 		if err != nil {
-			return err
+			return fmt.Errorf("fmt.Fprintf: %w", err)
 		}
 	}
 
@@ -248,7 +249,7 @@ func (c *cacheContentText) drawBorder(w io.Writer) error {
 		endY := startY
 		_, err := fmt.Fprintf(w, "%0.2f %0.2f m %0.2f %0.2f l s\n", startX, startY, endX, endY)
 		if err != nil {
-			return err
+			return fmt.Errorf("fmt.Fprintf: %w", err)
 		}
 	}
 
@@ -257,7 +258,7 @@ func (c *cacheContentText) drawBorder(w io.Writer) error {
 
 func (c *cacheContentText) underline(w io.Writer) error {
 	if c.fontSubset == nil {
-		return errors.New("error AppendUnderline not found font")
+		return errAppendUnderlineNotFound
 	}
 
 	coefLineHeight := defaultCoefLineHeight
@@ -289,7 +290,7 @@ func (c *cacheContentText) underline(w io.Writer) error {
 
 	yUnderlinePosition := c.pageHeight() - c.y + underlinePositionPx - baseline
 	if _, err := fmt.Fprintf(w, "%0.2f %0.2f %0.2f %0.2f re f\n", c.x, yUnderlinePosition, c.cellWidthPdfUnit, underlineThicknessPx); err != nil {
-		return err
+		return fmt.Errorf("fmt.Fprintf: %w", err)
 	}
 
 	return nil
@@ -299,7 +300,7 @@ func (c *cacheContentText) createContent() (float64, float64, error) {
 
 	cellWidthPdfUnit, cellHeightPdfUnit, textWidthPdfUnit, err := createContent(c.fontSubset, c.text, c.fontSize, c.charSpacing, c.rectangle)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("createContent: %w", err)
 	}
 	c.cellWidthPdfUnit = cellWidthPdfUnit
 	c.cellHeightPdfUnit = cellHeightPdfUnit
@@ -320,7 +321,7 @@ func createContent(f *SubsetFontObj, text string, fontSize float64, charSpacing 
 		if err == ErrCharNotFound {
 			continue
 		} else if err != nil {
-			return 0, 0, 0, err
+			return 0, 0, 0, fmt.Errorf("f.CharIndex: %w", err)
 		}
 
 		pairvalPdfUnit := 0
@@ -331,7 +332,7 @@ func createContent(f *SubsetFontObj, text string, fontSize float64, charSpacing 
 
 		width, err := f.CharWidth(r)
 		if err != nil {
-			return 0, 0, 0, err
+			return 0, 0, 0, fmt.Errorf("f.CharWidth: %w", err)
 		}
 
 		unitsPerPt := float64(unitsPerEm) / fontSize
